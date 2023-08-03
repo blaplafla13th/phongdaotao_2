@@ -1,0 +1,39 @@
+FROM php:8.2-fpm
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends\
+    git \
+    curl \
+    libpng-dev \
+    libonig-dev \
+    libxml2-dev \
+    zlib1g-dev \
+    libzip-dev \
+    zip \
+    unzip \
+
+
+
+# Install PHP extensions
+RUN docker-php-ext-install pdo_mysql mbstring exif pcntl bcmath gd zip
+
+# Clear cache
+RUN apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# Get latest Composer
+COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
+
+# Set working directory
+WORKDIR /var/www
+COPY user_module /var/www/
+
+# Get ADB
+EXPOSE 5037
+RUN curl curl https://dl.google.com/android/repository/platform-tools_r34.0.4-linux.zip --output adb.zip
+RUN unzip adb.zip
+RUN rm adb.zip
+RUN mv platform-tools/adb /usr/bin/adb
+RUN chmod +x /usr/bin/adb
+RUN rm -rf platform-tools
+
+ENTRYPOINT ["bash", "docker-entrypoint.sh"]
