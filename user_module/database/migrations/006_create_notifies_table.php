@@ -17,6 +17,7 @@ return new class extends Migration
             $table->id();
             $table->unsignedBigInteger('from');
             $table->unsignedBigInteger('to');
+            $table->string('address');
             $table->string('content');
             $table->timestamp('created_at')->useCurrent();
             $table->integer('kind');

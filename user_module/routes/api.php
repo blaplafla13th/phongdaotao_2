@@ -33,12 +33,12 @@ Route::group([
     Route::post('/refresh', [AuthController::class, 'refresh']);
     Route::get('/user-profile', [AuthController::class, 'userProfile']);
     Route::post('/change-pass', [AuthController::class, 'changePassword']);
+    Route::get('/check', [AuthController::class, 'checkToken']);
 });
 
 Route::group([
     'prefix' => 'users',
 ], function($router){
-    Route::get('/history',[UserController::class, 'showHistory']);
     Route::get('/{id}', [UserController::class, 'getAccount']);
     Route::get('/', [UserController::class, 'searchAccount']);
 })->withoutMiddleware([CheckAdmin::class]);
@@ -76,8 +76,6 @@ Route::group([
     Route::post('/', [UserController::class, 'createAccount']);
     Route::put('/{id}', [UserController::class, 'updateAccount']);
     Route::delete('/{id}', [UserController::class, 'deleteAccount']);
-    Route::get('/get-template', [UserController::class, 'excelTemplate']);
-    Route::post('/import', [UserController::class, 'importAccount']);
 });
 
 Route::group([
@@ -95,6 +93,14 @@ Route::group([
     Route::post('/', [DepartmentController::class, 'store']);
     Route::put('/{id}', [DepartmentController::class, 'update']);
     Route::delete('/{id}', [DepartmentController::class, 'destroy']);
-    Route::get('/get-template', [DepartmentController::class, 'getTemplate']);
-    Route::post('/import', [DepartmentController::class, 'import']);
+});
+
+Route::group([
+    'prefix' => 'template',
+    'middleware' => CheckAdmin::class,
+], function ($router) {
+    Route::post('/account', [UserController::class, 'importAccount']);
+    Route::get('/account', [UserController::class, 'excelTemplate']);
+    Route::post('/department', [DepartmentController::class, 'import']);
+    Route::get('/department', [DepartmentController::class, 'getTemplate']);
 });

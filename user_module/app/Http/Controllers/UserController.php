@@ -1,38 +1,92 @@
 <?php
 namespace App\Http\Controllers;
-use App\Enums\ActionType;
 use App\Enums\NotiType;
 use App\Enums\UserType;
-use App\Http\Request\MailRequest;
 use App\Http\Requests\Auth\CreateAccountRequest;
 use App\Http\Requests\Auth\UpdateAccountRequest;
+use App\Http\Requests\User\MailRequest;
+use App\Http\Requests\User\SmsRequest;
 use App\Models\Department;
 use App\Models\Notify;
 use App\Models\User;
-use App\Models\UserHistory;
 use Carbon\Carbon;
-use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
-use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Redis;
 use Illuminate\Support\Str;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Writer\Exception;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
-use Symfony\Component\Process\Process;
 
 class UserController extends Controller{
+
+    public static $cacheName = 'users';
+    /**
+     * @OA\Post(
+     *     path="/api/users",
+     *     summary="Create new user",
+     *     tags={"User"},
+     *     security={{"bearerAuth":{}}},
+     *     @OA\Response(
+     *     response="200",
+     *     description="User successfully created"
+     *    ),
+     *     @OA\RequestBody(
+     *     required=true,
+     *     @OA\JsonContent(
+     *     required={"name","email","password","phone","role","department_id"},
+     *     @OA\Property(property="name", type="string", example="John Doe"),
+     *     @OA\Property(property="email", type="string", example="example@example.com"),
+     *     @OA\Property(property="password", type="string", example="Password@123"),
+     *     @OA\Property(property="phone", type="string", example="0123456789"),
+     *     @OA\Property(property="role", type="string", example="1"),
+     *     @OA\Property(property="department_id", type="string", example="1"),
+     *     ),
+     *     ),
+     * ),
+     *
+     * @param CreateAccountRequest $request
+     * @return JsonResponse
+     */
     protected function createAccount(CreateAccountRequest $request): JsonResponse
     {
+        Redis::del(UserController::$cacheName);
         (new User())->query()->create($request->validated());
         return response()->json(['message' => 'User successfully created']);
     }
 
+    /**
+     * @OA\Put(
+     *     path="/api/users/{id}",
+     *     summary="Update user",
+     *     tags={"User"},
+     *     security={{"bearerAuth":{}}},
+     *     @OA\Response(
+     *     response="200",
+     *     description="User successfully updated"
+     *   ),
+     *     @OA\RequestBody(
+     *     required=true,
+     *     @OA\JsonContent(
+     *     required={"name","email","password","phone","role","department_id"},
+     *     @OA\Property(property="name", type="string", example="John Doe"),
+     *     @OA\Property(property="email", type="string", example="example@example.com"),
+     *     @OA\Property(property="password", type="string", example="Password@123"),
+     *     @OA\Property(property="phone", type="string", example="0123456789"),
+     *     @OA\Property(property="role", type="string", example="1"),
+     *     @OA\Property(property="department_id", type="string", example="1"),
+     *     ),
+     *     ),
+     * ),
+     * @param UpdateAccountRequest $request
+     * @param $id
+     * @return JsonResponse
+     */
     protected function updateAccount(UpdateAccountRequest $request, $id): JsonResponse
     {
+        Redis::del(UserController::$cacheName);
         $user = User::query()->findOrFail($id);
         if ($request->password !== null || $request->password !== '')
             $request->merge(['password' => bcrypt($request->password)]);
@@ -40,8 +94,32 @@ class UserController extends Controller{
         return response()->json(['message' => 'User successfully updated']);
     }
 
+    /**
+     * @OA\Delete(
+     *     path="/api/users/{id}",
+     *     summary="Delete user",
+     *     tags={"User"},
+     *     security={{"bearerAuth":{}}},
+     *     @OA\Response(
+     *     response="200",
+     *     description="User successfully deleted"
+     *  ),
+     *     @OA\Parameter(
+     *     name="id",
+     *     in="path",
+     *     description="User id",
+     *     required=true,
+     *     @OA\Schema(
+     *     type="integer",
+     *     )
+     *    ),
+     * ),
+     * @param $id
+     * @return JsonResponse
+     */
     protected function deleteAccount($id): JsonResponse
     {
+        Redis::del(UserController::$cacheName);
         $user = User::query()->findOrFail($id);
         if (auth()->id() === $user->id)
             return response()->json(['message' => 'You cannot delete your own account'], 403);
@@ -49,14 +127,135 @@ class UserController extends Controller{
         return response()->json(['message' => 'User successfully deleted']);
     }
 
+    /**
+     * @OA\Get(
+     *     path="/api/users/{id}",
+     *     summary="Get user",
+     *     tags={"User"},
+     *     @OA\Response(
+     *     response="200",
+     *     description="User successfully retrieved"
+     * ),
+     *     @OA\Parameter(
+     *     name="id",
+     *     in="path",
+     *     description="User id",
+     *     required=true,
+     *     @OA\Schema(
+     *     type="integer",
+     *     )
+     *   ),
+     * ),
+     * @param $id
+     * @return JsonResponse
+     */
     protected function getAccount($id): JsonResponse
     {
-        $user = User::query()->findOrFail($id);
-        return response()->json($user);
+        if (!Redis::hexists(UserController::$cacheName, $id)) {
+            $user = User::query()->findOrFail($id);
+            Redis::hset(UserController::$cacheName, $id, json_encode($user));
+        }
+        return response()->json(json_decode(Redis::hget(UserController::$cacheName, $id)));
     }
 
+
+    /**
+     * @OA\Get(
+     *     path="/api/users",
+     *     summary="Get users",
+     *     tags={"User"},
+     *     @OA\Response(
+     *     response="200",
+     *     description="Users successfully retrieved"
+     * ),
+     *     @OA\Parameter(
+     *     name="page",
+     *     in="query",
+     *     description="Page number",
+     *     required=false,
+     *     @OA\Schema(
+     *     type="integer",
+     *     )
+     *  ),
+     *     @OA\Parameter(
+     *     name="size",
+     *     in="query",
+     *     description="Page size",
+     *     required=false,
+     *     @OA\Schema(
+     *     type="integer",
+     *     )
+     *     ),
+     *     @OA\Parameter(
+     *     name="name",
+     *     in="query",
+     *     description="User name",
+     *     required=false,
+     *     @OA\Schema(
+     *     type="string",
+     *     )
+     *    ),
+     *     @OA\Parameter(
+     *     name="role",
+     *      in="query",
+     *     description="User role",
+     *     required=false,
+     *     @OA\Schema(
+     *     type="integer",
+     *     )
+     *   ),
+     *     @OA\Parameter(
+     *     name="email",
+     *     in="query",
+     *     description="User email",
+     *     required=false,
+     *     @OA\Schema(
+     *     type="string",
+     *     )
+     *  ),
+     *     @OA\Parameter(
+     *     name="phone",
+     *     in="query",
+     *     description="User phone",
+     *     required=false,
+     *     @OA\Schema(
+     *     type="string",
+     *     )
+     *  ),
+     *    @OA\Parameter(
+     *     name="department_id",
+     *     in="query",
+     *     description="User department id",
+     *     required=false,
+     *     @OA\Schema(
+     *     type="integer",
+     *     )
+     *  ),
+     *    @OA\Parameter(
+     *     name="orderBy",
+     *     in="query",
+     *     description="Sort by column",
+     *     required=false,
+     *     @OA\Schema(
+     *     type="string",
+     *     )
+     *  ),
+     *     @OA\Parameter(
+     *     name="order",
+     *     in="query",
+     *     description="Sort order: asc or desc",
+     *     required=false,
+     *     @OA\Schema(
+     *     type="string",
+     *     )
+     *  ),
+     * ),
+     * @param Request $request
+     * @return JsonResponse
+     */
     protected function searchAccount(Request $request): JsonResponse
     {
+        if (!Redis::hexists(UserController::$cacheName, json_encode($request->all()))) {
         $users = User::query();
         if ($request->has('name')){
             $users = $users->whereRaw('LOWER(`name`) like ?', "%".strtolower($request->name)."%");
@@ -69,9 +268,36 @@ class UserController extends Controller{
             $users = $users->where('phone', 'like', '%'.$request->phone.'%');
         if ($request->has('department_id'))
             $users = $users->where('department_id', $request->department_id);
-        $users = $users->paginate($request->size??10, ['id','name','email','phone','role'], 'page', $request->page??0);
-        return response()->json($users);
+            if (!in_array($request->order, ['asc', 'desc']))
+                $request->order = 'desc';
+            if (!in_array($request->orderBy, ['id', 'name', 'email', 'phone', 'role', 'created_at']))
+                $request->orderBy = 'created_at';
+            $users = $users->orderBy($request->orderBy ?? 'created_at', $request->order);
+            $users = $users->paginate($request->size ?? 10, ['id', 'name', 'email', 'phone', 'role', 'created_at'], 'page', $request->page ?? 0);
+            Redis::hset(UserController::$cacheName, json_encode($request->all()), json_encode($users));
+        }
+        return response()->json(json_decode(Redis::hget(UserController::$cacheName, json_encode($request->all()))));
     }
+
+    /**
+     * @OA\Get(
+     *     path="/api/template/account",
+     *     summary="Get template",
+     *     tags={"User"},
+     *     security={{"bearerAuth":{}}},
+     *   @OA\Response(
+     *  response="200",
+     *  description="Template file",
+     *   @OA\Schema(
+     *       type="file",
+     *       format="binary"
+     *      ),
+     *  ),
+     * ),
+     *
+     * @return JsonResponse|void
+     * @throws Exception
+     */
 
     protected function excelTemplate()
     {
@@ -80,7 +306,7 @@ class UserController extends Controller{
 
         $spreadsheet = new Spreadsheet();
         $sheet = $spreadsheet->getActiveSheet();
-        $sheet->fromArray($header, NULL, 'A1');
+        $sheet->fromArray($header);
 
         // redirect output to client browser
         header('Content-Disposition: attachment;filename="template.xlsx"');
@@ -88,21 +314,33 @@ class UserController extends Controller{
         header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
 
         $writer = new Xlsx($spreadsheet);
-        try {
-            $writer->save('php://output');
-        } catch (Exception $e) {
-            return response()->json(['message' => 'Error when downloading file'], 500);
-        }
+        $writer->save('php://output');
+
     }
 
+    /**
+     * @OA\Post(
+     *     path="/api/template/account",
+     *     summary="Import users",
+     *     tags={"User"},
+     *     security={{"bearerAuth":{}}},
+     *     @OA\Response(
+     *     response="200",
+     *     description="Users successfully imported"
+     * ),
+     * ),
+     * @param Request $request
+     * @return JsonResponse
+     */
     protected function importAccount(Request $request): JsonResponse
     {
+        Redis::del(UserController::$cacheName);
         $file = $request->file('file');
-        $file->storeAs('',Carbon::now()->timestamp."_UserImport_".auth()->user()->id.".xlsx",'s3');
+        $file->storeAs('', Carbon::now()->timestamp . "_UserImport_" . auth()->id() . ".xlsx", 's3');
         $reader = new \PhpOffice\PhpSpreadsheet\Reader\Xlsx();
         try {
             $spreadsheet = $reader->load($file);
-        } catch (\PhpOffice\PhpSpreadsheet\Reader\Exception $e) {
+        } catch (\PhpOffice\PhpSpreadsheet\Reader\Exception) {
             return response()->json(['message' => 'Error when reading file'], 500);
         }
         $sheetData = $spreadsheet->getActiveSheet()->toArray();
@@ -163,8 +401,25 @@ class UserController extends Controller{
             ]);
     }
 
+    /**
+     * @OA\Post(
+     *    path="/api/users/send-mail/{id}",
+     *     summary="Send mail to user",
+     *     tags={"User"},
+     *     security={{"bearerAuth":{}}},
+     *     @OA\Response(
+     *     response="200",
+     *     description="Send mail successfully"
+     * ),
+     * ),
+     *
+     * @param $id
+     * @param MailRequest $request
+     * @return JsonResponse
+     */
     public function mail($id, MailRequest $request): JsonResponse
     {
+        Redis::del(HistoryController::$cacheNameNoti);
         $user = User::query()->findOrFail($id);
         Mail::raw($request->body, function ($message) use ($request, $user) {
             $message->to($user->email, $user->name)
@@ -173,14 +428,32 @@ class UserController extends Controller{
         Notify::query()->create([
             'from' => auth()->id(),
             'to' => $user->id,
+            'address' => $user->email,
             'content' => $request->subject.": ".$request->body,
             'type' => NotiType::Email,
         ]);
         return response()->json(['message' => 'Send mail successfully']);
     }
 
+    /**
+     * @OA\Post(
+     *     path="/api/users/send-sms/{id}",
+     *     summary="Send sms to user",
+     *     tags={"User"},
+     *     security={{"bearerAuth":{}}},
+     *     @OA\Response(
+     *     response="200",
+     *     description="Send sms successfully"
+     * ),
+     * ),
+     *
+     * @param $id
+     * @param SmsRequest $request
+     * @return JsonResponse
+     */
     public function sms($id, SmsRequest $request): JsonResponse
     {
+        Redis::del(HistoryController::$cacheNameNoti);
         $user = User::query()->findOrFail($id);
         // check adb devices
         $list = explode("\n", shell_exec("adb devices"));
@@ -195,6 +468,7 @@ class UserController extends Controller{
             'from' => auth()->id(),
             'to' => $user->id,
             'content' => $request->message,
+            'address' => $user->phone,
             'type' => NotiType::SMS,
         ]);
         return response()->json(['message' => 'Send sms successfully']);
