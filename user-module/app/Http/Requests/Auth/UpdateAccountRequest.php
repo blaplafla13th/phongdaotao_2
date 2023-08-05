@@ -3,7 +3,6 @@
 namespace App\Http\Requests\Auth;
 
 use App\Enums\UserType;
-
 use App\Models\User;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;

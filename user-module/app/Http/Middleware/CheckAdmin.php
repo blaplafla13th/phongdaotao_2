@@ -4,6 +4,7 @@ namespace App\Http\Middleware;
 use App\Enums\UserType;
 use Closure;
 use Illuminate\Http\Request;
+
 class CheckAdmin
 {
     public function handle(Request $request, Closure $next)
