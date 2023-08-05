@@ -33,7 +33,6 @@ Route::group([
     Route::post('/refresh', [AuthController::class, 'refresh']);
     Route::get('/user-profile', [AuthController::class, 'userProfile']);
     Route::post('/change-pass', [AuthController::class, 'changePassword']);
-    Route::get('/check', [AuthController::class, 'checkToken']);
 });
 
 Route::group([

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\ActionType;
 use App\Models\Department;
 use App\Models\DepartmentHistory;
 use App\Models\Notify;
@@ -51,24 +52,6 @@ class HistoryController extends Controller
      *     type="integer"
      *  ),
      *     ),
-     * @OA\Parameter(
-     *       name="orderBy",
-     *       in="query",
-     *       description="Sort field",
-     *       required=false,
-     *       @OA\Schema(
-     *       type="string"
-     *    ),
-     *       ),
-     * @OA\Parameter(
-     *       name="order",
-     *       in="query",
-     *       description="Sort direction: asc or desc",
-     *       required=false,
-     *       @OA\Schema(
-     *       type="string"
-     *    ),
-     *       ),
      * ),
      *
      * @param Request $request
@@ -82,11 +65,6 @@ class HistoryController extends Controller
             $history = UserHistory::query();
             if ($request->has('id'))
                 $history = $history->where('user_id', $request->id);
-            if (!in_array($request->order, ['asc', 'desc']))
-                $request->order = 'desc';
-            if (!in_array($request->orderBy, ['id', 'user_id', 'name', 'email', 'password', 'phone', 'role', 'department_id', 'created_at', 'status', 'created_by']))
-                $request->orderBy = 'created_at';
-            $history = $history->orderBy($request->orderBy, $request->order);
             $history =
                 $history->paginate($request->size ?? 10, ['*'], 'page', $request->page ?? 0);
             Redis::hset(HistoryController::$cacheNameUsers, json_encode($request->all()), json_encode($history));
@@ -154,16 +132,21 @@ class HistoryController extends Controller
         Redis::del(UserController::$cacheName);
         Redis::del(HistoryController::$cacheNameUsers);
         $history = UserHistory::query()->findOrFail($id);
-        User::query()->updateOrCreate([
-            'id' => $history->user_id
-        ], [
-            'name' => $history->name,
-            'email' => $history->email,
-            'phone' => $history->phone,
-            'role' => $history->role,
-            'department_id' => $history->department_id,
-            'password' => $history->password,
-        ]);
+        if ($history->status != ActionType::CREATE)
+            User::query()->updateOrCreate([
+                'id' => $history->user_id
+            ], [
+                'name' => $history->name,
+                'email' => $history->email,
+                'phone' => $history->phone,
+                'role' => $history->role,
+                'department_id' => $history->department_id,
+                'password' => $history->password,
+            ]);
+        else if ($history->user_id != auth()->id())
+            User::query()->findOrFail($history->user_id)->delete();
+        else
+            return response()->json(['message' => 'You cannot delete your own account'], 403);
         return response()->json(['message' => 'Restore successfully']);
     }
 
@@ -206,24 +189,6 @@ class HistoryController extends Controller
      *      type="integer"
      *   ),
      *      ),
-     *      @OA\Parameter(
-     *      name="orderBy",
-     *      in="query",
-     *      description="Sort field",
-     *      required=false,
-     *      @OA\Schema(
-     *      type="string"
-     *   ),
-     *      ),
-     *      @OA\Parameter(
-     *      name="order",
-     *      in="query",
-     *      description="Sort direction: asc or desc",
-     *      required=false,
-     *      @OA\Schema(
-     *      type="string"
-     *   ),
-     *      ),
      * ),
      * @param Request $request
      * @return JsonResponse
@@ -233,13 +198,9 @@ class HistoryController extends Controller
     {
         if (!Redis::hexists(HistoryController::$cacheNameDepartments, json_encode($request->all()))) {
             $history = DepartmentHistory::query();
-            if ($request->has('department_id'))
+            if ($request->has('department_id')) {
                 $history->where('department_id', $request->department_id);
-            if (!in_array($request->order, ['asc', 'desc']))
-                $request->order = 'desc';
-            if (!in_array($request->orderBy, ['id', 'department_id', 'name', 'created_at', 'status', 'created_by']))
-                $request->orderBy = 'created_at';
-            $history = $history->orderBy($request->orderBy ?? 'created_at', $request->order);
+            }
             $history =
                 $history->paginate($request->size ?? 10, ['*'], 'page', $request->page ?? 0);
             Redis::hset(HistoryController::$cacheNameDepartments, json_encode($request->all()), json_encode($history));
@@ -307,11 +268,14 @@ class HistoryController extends Controller
         Redis::del(HistoryController::$cacheNameDepartments);
         Redis::del(DepartmentController::$cacheName);
         $history = DepartmentHistory::query()->findOrFail($id);
-        Department::query()->createOrUpdate([
-            'id' => $history->department_id
-        ], [
-            'name' => $history->name
-        ]);
+        if ($history->status != ActionType::CREATE)
+            Department::query()->createOrUpdate([
+                'id' => $history->department_id
+            ], [
+                'name' => $history->name
+            ]);
+        else
+            Department::query()->findOrFail($history->department_id)->delete();
         return response()->json(['message' => 'Restore successfully']);
     }
 
@@ -354,24 +318,6 @@ class HistoryController extends Controller
      *      type="integer"
      *   ),
      *      ),
-     *@OA\Parameter(
-     *      name="orderBy",
-     *      in="query",
-     *      description="Sort by column",
-     *      required=false,
-     *      @OA\Schema(
-     *      type="string",
-     *      )
-     *   ),
-     * @OA\Parameter(
-     *      name="order",
-     *      in="query",
-     *      description="Sort order: asc or desc",
-     *      required=false,
-     *      @OA\Schema(
-     *      type="string",
-     *      )
-     *   ),
      * ),
      * @param Request $request
      * @return JsonResponse
@@ -384,11 +330,6 @@ class HistoryController extends Controller
             $history = Notify::query();
             if ($request->has('id'))
                 $history = $history->where('to', $request->id);
-            if (!in_array($request->order, ['asc', 'desc']))
-                $request->order = 'desc';
-            if (!in_array($request->orderBy, ['id', 'to', 'from', 'title', 'content', 'created_at', 'status', 'created_by', 'address']))
-                $request->orderBy = 'created_at';
-            $history = $history->orderBy($request->orderBy ?? 'created_at', $request->order);
             $history = $history->paginate($request->size ?? 10, ['*'], 'page', $request->page ?? 0);
             Redis::hset(HistoryController::$cacheNameNoti, json_encode($request->all()), json_encode($history));
         }

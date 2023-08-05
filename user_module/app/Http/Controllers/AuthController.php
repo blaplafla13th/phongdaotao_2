@@ -7,7 +7,7 @@ use App\Http\Requests\Auth\LoginRequest;
 use App\Http\Requests\User\UpdatePassword;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
-
+use Illuminate\Support\Facades\Redis;
 
 class AuthController extends Controller
 {
@@ -61,6 +61,7 @@ class AuthController extends Controller
      */
     public function logout(): JsonResponse
     {
+        Redis::del('Auth:' . request()->bearerToken());
         auth()->logout();
         return response()->json(['message' => 'User successfully signed out']);
     }
@@ -79,6 +80,7 @@ class AuthController extends Controller
      */
     public function refresh(): JsonResponse
     {
+        Redis::del('Auth:' . request()->bearerToken());
         return $this->createNewToken(auth()->refresh());
     }
 
@@ -94,29 +96,9 @@ class AuthController extends Controller
      *  ),
      *),
      */
-    public function userProfile(): JsonResponse
+    public function userProfile()
     {
-        return response()->json(auth()->user());
-    }
-
-    /**
-     * @OA\Get(
-     *     path="/api/auth/check",
-     *     tags={"Auth"},
-     *     description="Check token",
-     *     security={{"bearerAuth":{}}},
-     *     @OA\Response(
-     *     response="200",
-     *     description="Id and role"
-     *  ),
-     * ),
-     */
-    public function checkToken(): JsonResponse
-    {
-        return response()->json([
-            "id" => auth()->id(),
-            'role' => auth()->user()->role
-        ]);
+        return response()->json(json_decode(Redis::get('Auth:' . request()->bearerToken())));
     }
 
     /**
@@ -125,6 +107,10 @@ class AuthController extends Controller
      */
     protected function createNewToken($token): JsonResponse
     {
+        Redis::set('Auth:' . $token,
+            json_encode(auth()->user()),
+            'EX',
+            auth()->factory()->getTTL() * 60);
         return response()->json([
             'access_token' => $token,
             'token_type' => 'bearer',
@@ -155,6 +141,7 @@ class AuthController extends Controller
      */
     protected function changePassword(UpdatePassword $request): JsonResponse
     {
+        Redis::del('Auth:' . request()->bearerToken());
         $userId = User::query()->findOrFail(auth()->id());
         $user = User::query()->where('id', $userId,'password',$request->old_password);
         if (!$user) {

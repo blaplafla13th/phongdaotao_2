@@ -231,24 +231,6 @@ class UserController extends Controller{
      *     type="integer",
      *     )
      *  ),
-     *    @OA\Parameter(
-     *     name="orderBy",
-     *     in="query",
-     *     description="Sort by column",
-     *     required=false,
-     *     @OA\Schema(
-     *     type="string",
-     *     )
-     *  ),
-     *     @OA\Parameter(
-     *     name="order",
-     *     in="query",
-     *     description="Sort order: asc or desc",
-     *     required=false,
-     *     @OA\Schema(
-     *     type="string",
-     *     )
-     *  ),
      * ),
      * @param Request $request
      * @return JsonResponse
@@ -268,12 +250,7 @@ class UserController extends Controller{
             $users = $users->where('phone', 'like', '%'.$request->phone.'%');
         if ($request->has('department_id'))
             $users = $users->where('department_id', $request->department_id);
-            if (!in_array($request->order, ['asc', 'desc']))
-                $request->order = 'desc';
-            if (!in_array($request->orderBy, ['id', 'name', 'email', 'phone', 'role', 'created_at']))
-                $request->orderBy = 'created_at';
-            $users = $users->orderBy($request->orderBy ?? 'created_at', $request->order);
-            $users = $users->paginate($request->size ?? 10, ['id', 'name', 'email', 'phone', 'role', 'created_at'], 'page', $request->page ?? 0);
+        $users = $users->paginate($request->size??10, ['id','name','email','phone','role'], 'page', $request->page??0);
             Redis::hset(UserController::$cacheName, json_encode($request->all()), json_encode($users));
         }
         return response()->json(json_decode(Redis::hget(UserController::$cacheName, json_encode($request->all()))));
@@ -428,7 +405,6 @@ class UserController extends Controller{
         Notify::query()->create([
             'from' => auth()->id(),
             'to' => $user->id,
-            'address' => $user->email,
             'content' => $request->subject.": ".$request->body,
             'type' => NotiType::Email,
         ]);
@@ -468,7 +444,6 @@ class UserController extends Controller{
             'from' => auth()->id(),
             'to' => $user->id,
             'content' => $request->message,
-            'address' => $user->phone,
             'type' => NotiType::SMS,
         ]);
         return response()->json(['message' => 'Send sms successfully']);

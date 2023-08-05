@@ -5,10 +5,12 @@ namespace App\Models;
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
 use App\Enums\ActionType;
 use App\Enums\UserType;
+use App\Http\Controllers\HistoryController;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Redis;
 use Laravel\Sanctum\HasApiTokens;
 use Tymon\JWTAuth\Contracts\JWTSubject;
 
@@ -45,6 +47,8 @@ class User extends Authenticatable implements JWTSubject
     protected $hidden = [
         'password',
         'remember_token',
+        'email_verified_at',
+        'created_at',
     ];
 
     /**
@@ -83,6 +87,7 @@ class User extends Authenticatable implements JWTSubject
     {
         parent::boot();
         self::created(function ($model) {
+            Redis::del(HistoryController::$cacheNameUsers);
             DB::table('user_histories')->insert([
                 'user_id' => $model->id,
                 'name' => $model->name,
@@ -95,6 +100,7 @@ class User extends Authenticatable implements JWTSubject
             ]);
         });
         self::updated(function ($model) {
+            Redis::del(HistoryController::$cacheNameUsers);
             DB::table('user_histories')->insert([
                 'user_id' => $model->id,
                 'name' => $model->name,
@@ -107,6 +113,7 @@ class User extends Authenticatable implements JWTSubject
             ]);
         });
         self::deleting(function ($model) {
+            Redis::del(HistoryController::$cacheNameUsers);
             DB::table('user_histories')->insert([
                 'user_id' => $model->id,
                 'name' => $model->name,

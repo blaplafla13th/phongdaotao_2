@@ -11,7 +11,7 @@ services:
     depends_on:
       - user-api
       - minio
-  minio: # run and setup first for other api
+  minio: # run and setup first for all api
     image: minio/minio
 #    ports:
 #      - "9000:9000"
@@ -23,12 +23,19 @@ services:
       - MINIO_ROOT_PASSWORD=password
       - MINIO_REGION=us-east-1
     command: server --console-address ":9001" /data
+  redis: # turn it first for all api
+    image: redis:latest
+    ports:
+      - "6379:6379"
+    command: redis-server --requirepass password
   user-api: # turn it after userdb and wait until it done then open terminal connect adb with phone
     build:
       context: .
       dockerfile: Dockerfile-UserModule
     depends_on:
       - userdb
+      - minio
+      - redis
     volumes:
       - ./user_module/:/var/www
   userdb: # turn it and wait until it done before turn user-api

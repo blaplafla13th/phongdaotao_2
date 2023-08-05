@@ -52,24 +52,6 @@ class DepartmentController extends Controller
      *     type="integer"
      *   ),
      *     ),
-     *           @OA\Parameter(
-     *       name="orderBy",
-     *       in="query",
-     *       description="Sort field",
-     *       required=false,
-     *       @OA\Schema(
-     *       type="string"
-     *    ),
-     *       ),
-     *       @OA\Parameter(
-     *       name="order",
-     *       in="query",
-     *       description="Sort direction: asc or desc",
-     *       required=false,
-     *       @OA\Schema(
-     *       type="string"
-     *    ),
-     *       ),
      *  ),
      * Display a listing of the resource.
      *
@@ -85,11 +67,6 @@ class DepartmentController extends Controller
                     'LOWER(`name`) like ?',
                     "%" . strtolower($request->name) . "%"
                 );
-            if (!in_array($request->order, ['asc', 'desc']))
-                $request->order = 'desc';
-            if (!in_array($request->orderBy, ['id', 'name']))
-                $request->orderBy = 'id';
-            $departments = $departments->orderBy($request->orderBy, $request->order);
             $final = $departments->paginate($request->size ?? 10, ['id', 'name'],
                 'page', $request->page ?? 0);
             Redis::hset(DepartmentController::$cacheName, json_encode($request->all()), json_encode($final));
