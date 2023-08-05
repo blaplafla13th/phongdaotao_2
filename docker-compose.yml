@@ -37,7 +37,7 @@ services:
       - minio
       - redis
     volumes:
-      - ./user_module/:/var/www
+      - ./user-module/:/var/www
   userdb: # turn it and wait until it done before turn user-api
     image: mysql:latest
     environment:

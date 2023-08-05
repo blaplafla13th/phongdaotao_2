@@ -25,7 +25,7 @@ COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
 # Set working directory
 WORKDIR /var/www
-COPY user_module /var/www/
+COPY user-module /var/www/
 
 # Get ADB
 EXPOSE 5037

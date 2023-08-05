@@ -53,7 +53,15 @@ class UserController extends Controller{
     protected function createAccount(CreateAccountRequest $request): JsonResponse
     {
         Redis::del(UserController::$cacheName);
-        (new User())->query()->create($request->validated());
+        Redis::del(HistoryController::$cacheNameUsers);
+        (new User())->query()->create([
+            "name" => $request->name,
+            "email" => $request->email,
+            "phone" => $request->phone,
+            "role" => $request->role,
+            "password" => bcrypt($request->password),
+            "department_id" => $request->department_id ?? null,
+        ]);
         return response()->json(['message' => 'User successfully created']);
     }
 
@@ -88,9 +96,14 @@ class UserController extends Controller{
     {
         Redis::del(UserController::$cacheName);
         $user = User::query()->findOrFail($id);
-        if ($request->password !== null || $request->password !== '')
-            $request->merge(['password' => bcrypt($request->password)]);
-        $user->update($request->validated());
+        $user->update([
+            "name" => $request->name,
+            "email" => $request->email,
+            "phone" => $request->phone,
+            "role" => $request->role,
+            "password" => bcrypt($request->password),
+            "department_id" => $request->department_id ?? null,
+        ]);
         return response()->json(['message' => 'User successfully updated']);
     }
 
