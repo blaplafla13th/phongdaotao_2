@@ -38,6 +38,7 @@ services:
       - redis
     volumes:
       - ./user-module/:/var/www
+      - /var/www/vendor
   userdb: # turn it and wait until it done before turn user-api
     image: mysql:latest
     environment:

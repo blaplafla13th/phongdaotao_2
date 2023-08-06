@@ -21,15 +21,14 @@ class UpdateAccountRequest extends FormRequest
             'email'    => [
                 'required',
                 'email',
-                Rule::unique(User::class)->ignore($this->user), // ignore the current user's email address
+                Rule::unique(User::class)->ignore($this->id), // ignore the current user's email address
             ],
             'phone'    => [
                 'required',
                 'string',
                 'numeric',
-                'min:10',
-                'max:10',
-                Rule::unique(User::class)->ignore($this->user), // ignore the current user's phone number
+                'regex:/[0-9]{10}/',
+                Rule::unique(User::class)->ignore($this->id), // ignore the current user's phone number
             ],
             'password' => [
                 'string',

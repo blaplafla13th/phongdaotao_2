@@ -52,6 +52,24 @@ class HistoryController extends Controller
      *     type="integer"
      *  ),
      *     ),
+     *          @OA\Parameter(
+     *      name="sortBy",
+     *      in="query",
+     *      description="Sort by column",
+     *      required=false,
+     *      @OA\Schema(
+     *      type="string",
+     *      )
+     *      ),
+     *      @OA\Parameter(
+     *      name="order",
+     *      in="query",
+     *      description="Sort order",
+     *       required=false,
+     *      @OA\Schema(
+     *      type="string",
+     *      )
+     *     ),
      * ),
      *
      * @param Request $request
@@ -65,8 +83,14 @@ class HistoryController extends Controller
             $history = UserHistory::query();
             if ($request->has('id'))
                 $history = $history->where('user_id', $request->id);
+            if (!$request->has('sortBy') || !in_array($request->sortBy, ['id', "user_id", 'name', 'email', 'phone', 'role',
+                    'department_id', 'created_at', 'status', 'created_by']))
+                $request->sortBy = 'created_at';
+            if (!$request->has('order') || !in_array($request->order, ['asc', 'desc']))
+                $request->order = 'desc';
             $history =
-                $history->paginate($request->size ?? 10, ['*'], 'page', $request->page ?? 0);
+                $history->orderBy($request->sortBy, $request->order)
+                    ->paginate($request->size ?? 10, ['*'], 'page', $request->page ?? 0);
             Redis::hset(HistoryController::$cacheNameUsers, json_encode($request->all()), json_encode($history));
         }
         return response()->json(json_decode(Redis::hget(HistoryController::$cacheNameUsers, json_encode($request->all()))));
@@ -189,6 +213,24 @@ class HistoryController extends Controller
      *      type="integer"
      *   ),
      *      ),
+     *          @OA\Parameter(
+     *      name="sortBy",
+     *      in="query",
+     *      description="Sort by column",
+     *      required=false,
+     *      @OA\Schema(
+     *      type="string",
+     *      )
+     *      ),
+     *      @OA\Parameter(
+     *      name="order",
+     *      in="query",
+     *      description="Sort order",
+     *       required=false,
+     *      @OA\Schema(
+     *      type="string",
+     *      )
+     *     ),
      * ),
      * @param Request $request
      * @return JsonResponse
@@ -201,8 +243,14 @@ class HistoryController extends Controller
             if ($request->has('department_id')) {
                 $history->where('department_id', $request->department_id);
             }
+            if (!$request->has('sortBy') || !in_array($request->sortBy, ['id', 'name',
+                    'department_id', 'created_at', 'status', 'created_by']))
+                $request->sortBy = 'created_at';
+            if (!$request->has('order') || !in_array($request->order, ['asc', 'desc']))
+                $request->order = 'desc';
             $history =
-                $history->paginate($request->size ?? 10, ['*'], 'page', $request->page ?? 0);
+                $history->orderBy($request->sortBy, $request->order)
+                    ->paginate($request->size ?? 10, ['*'], 'page', $request->page ?? 0);
             Redis::hset(HistoryController::$cacheNameDepartments, json_encode($request->all()), json_encode($history));
         }
         return response()->json(json_decode(Redis::hget(HistoryController::$cacheNameDepartments, json_encode($request->all()))));
@@ -318,6 +366,24 @@ class HistoryController extends Controller
      *      type="integer"
      *   ),
      *      ),
+     *          @OA\Parameter(
+     *      name="sortBy",
+     *      in="query",
+     *      description="Sort by column",
+     *      required=false,
+     *      @OA\Schema(
+     *      type="string",
+     *      )
+     *      ),
+     *      @OA\Parameter(
+     *      name="order",
+     *      in="query",
+     *      description="Sort order",
+     *       required=false,
+     *      @OA\Schema(
+     *      type="string",
+     *      )
+     *     ),
      * ),
      * @param Request $request
      * @return JsonResponse
@@ -330,7 +396,14 @@ class HistoryController extends Controller
             $history = Notify::query();
             if ($request->has('id'))
                 $history = $history->where('to', $request->id);
-            $history = $history->paginate($request->size ?? 10, ['*'], 'page', $request->page ?? 0);
+            if (!$request->has('sortBy') || !in_array($request->sortBy, ['id', 'from', 'to', 'address'
+                    , 'created_at', 'kind', 'content']))
+                $request->sortBy = 'created_at';
+            if (!$request->has('order') || !in_array($request->order, ['asc', 'desc']))
+                $request->order = 'desc';
+            $history =
+                $history->orderBy($request->sortBy, $request->order)
+                    ->paginate($request->size ?? 10, ['*'], 'page', $request->page ?? 0);
             Redis::hset(HistoryController::$cacheNameNoti, json_encode($request->all()), json_encode($history));
         }
         return response()->json(json_decode(Redis::hget(HistoryController::$cacheNameNoti, json_encode($request->all()))));

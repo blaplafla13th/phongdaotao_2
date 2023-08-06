@@ -24,8 +24,8 @@ class CreateAccountRequest extends FormRequest
             ],
             'phone'    => [
                 'required',
-                'numeric',
-                'size:10',
+                'string',
+                'regex:/[0-9]{10}/',
                 'unique:users,phone'
             ],
             'password' => [

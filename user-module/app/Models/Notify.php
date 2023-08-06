@@ -9,4 +9,12 @@ class Notify extends Model
 {
     use HasFactory;
     protected $table = 'notifies';
+    protected $fillable = [
+        'from',
+        'to',
+        'address',
+        'content',
+        'kind'
+    ];
+    public $timestamps = false;
 }
