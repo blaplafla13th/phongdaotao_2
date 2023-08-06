@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Http\Requests\Department\StoreDepartmentRequest;
 use App\Http\Requests\Department\UpdateDepartmentRequest;
 use App\Models\Department;
+use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Redis;
@@ -52,6 +53,24 @@ class DepartmentController extends Controller
      *     type="integer"
      *   ),
      *     ),
+     *          @OA\Parameter(
+     *      name="sortBy",
+     *      in="query",
+     *      description="Sort by column",
+     *      required=false,
+     *      @OA\Schema(
+     *      type="string",
+     *      )
+     *      ),
+     *      @OA\Parameter(
+     *      name="order",
+     *      in="query",
+     *      description="Sort order",
+     *       required=false,
+     *      @OA\Schema(
+     *      type="string",
+     *      )
+     *     ),
      *  ),
      * Display a listing of the resource.
      *
@@ -67,9 +86,16 @@ class DepartmentController extends Controller
                     'LOWER(`name`) like ?',
                     "%" . strtolower($request->name) . "%"
                 );
-            $final = $departments->paginate($request->size ?? 10, ['id', 'name'],
+            if (!$request->has('orderBy') || !in_array($request->orderBy, ['id', 'name', "created_at"])) {
+                $request->orderBy = "created_at";
+            }
+            if (!$request->has('order') || !in_array($request->orderType, ['asc', 'desc'])) {
+                $request->orderType = "desc";
+            }
+            $departments = $departments->orderBy($request->orderBy, $request->orderType)
+                ->paginate($request->size ?? 10, ['id', 'name', "created_at"],
                 'page', $request->page ?? 0);
-            Redis::hset(DepartmentController::$cacheName, json_encode($request->all()), json_encode($final));
+            Redis::hset(DepartmentController::$cacheName, json_encode($request->all()), json_encode($departments));
         }
         return response()->json(json_decode(Redis::hget(DepartmentController::$cacheName, json_encode($request->all()))));
     }
@@ -282,6 +308,7 @@ class DepartmentController extends Controller
     {
         Redis::del(DepartmentController::$cacheName);
         $file = $request->file('file');
+        $file->storeAs('', Carbon::now()->timestamp . "_DepartmentImport_" . auth()->id() . ".xlsx", 's3');
         $reader = new \PhpOffice\PhpSpreadsheet\Reader\Xlsx();
         try {
             $spreadsheet = $reader->load($file);

@@ -53,6 +53,7 @@ class UserController extends Controller{
     protected function createAccount(CreateAccountRequest $request): JsonResponse
     {
         Redis::del(UserController::$cacheName);
+        Redis::del(HistoryController::$cacheNameUsers);
         (new User())->query()->create($request->validated());
         return response()->json(['message' => 'User successfully created']);
     }
@@ -67,6 +68,15 @@ class UserController extends Controller{
      *     response="200",
      *     description="User successfully updated"
      *   ),
+     *     @OA\Parameter(
+     *     name="id",
+     *     in="path",
+     *     description="User id",
+     *     required=true,
+     *     @OA\Schema(
+     *     type="integer",
+     *      ),
+     *     ),
      *     @OA\RequestBody(
      *     required=true,
      *     @OA\JsonContent(
@@ -84,9 +94,11 @@ class UserController extends Controller{
      * @param $id
      * @return JsonResponse
      */
-    protected function updateAccount(UpdateAccountRequest $request, $id): JsonResponse
+    protected function updateAccount(UpdateAccountRequest $request, $id)/*: JsonResponse*/
     {
         Redis::del(UserController::$cacheName);
+        Redis::del(HistoryController::$cacheNameUsers);
+        $this->revokeToken($id);
         $user = User::query()->findOrFail($id);
         if ($request->password !== null || $request->password !== '')
             $request->merge(['password' => bcrypt($request->password)]);
@@ -120,6 +132,8 @@ class UserController extends Controller{
     protected function deleteAccount($id): JsonResponse
     {
         Redis::del(UserController::$cacheName);
+        Redis::del(HistoryController::$cacheNameUsers);
+        $this->revokeToken($id);
         $user = User::query()->findOrFail($id);
         if (auth()->id() === $user->id)
             return response()->json(['message' => 'You cannot delete your own account'], 403);
@@ -231,6 +245,24 @@ class UserController extends Controller{
      *     type="integer",
      *     )
      *  ),
+     *     @OA\Parameter(
+     *     name="sortBy",
+     *     in="query",
+     *     description="Sort by column",
+     *     required=false,
+     *     @OA\Schema(
+     *     type="string",
+     *     )
+     *     ),
+     *     @OA\Parameter(
+     *     name="order",
+     *     in="query",
+     *     description="Sort order",
+     *      required=false,
+     *     @OA\Schema(
+     *     type="string",
+     *     )
+     *    ),
      * ),
      * @param Request $request
      * @return JsonResponse
@@ -250,7 +282,13 @@ class UserController extends Controller{
             $users = $users->where('phone', 'like', '%'.$request->phone.'%');
         if ($request->has('department_id'))
             $users = $users->where('department_id', $request->department_id);
-        $users = $users->paginate($request->size??10, ['id','name','email','phone','role'], 'page', $request->page??0);
+            if (!$request->has('sortBy') || !in_array($request->sortBy, ['id', 'name', 'email', 'phone',
+                    'role', 'department_id', 'created_at']))
+                $request->sortBy = 'created_at';
+            if (!$request->has('order') || !in_array($request->order, ['asc', 'desc']))
+                $request->order = 'desc';
+            $users = $users->orderBy($request->sortBy, $request->order)
+                ->paginate($request->size ?? 10, ['id', 'name', 'email', 'phone', 'role', 'department_id', 'created_at'], 'page', $request->page ?? 0);
             Redis::hset(UserController::$cacheName, json_encode($request->all()), json_encode($users));
         }
         return response()->json(json_decode(Redis::hget(UserController::$cacheName, json_encode($request->all()))));
@@ -272,7 +310,7 @@ class UserController extends Controller{
      *  ),
      * ),
      *
-     * @return JsonResponse|void
+     * @return void
      * @throws Exception
      */
 
@@ -305,6 +343,19 @@ class UserController extends Controller{
      *     response="200",
      *     description="Users successfully imported"
      * ),
+     *          @OA\RequestBody(
+     *       @OA\MediaType(
+     *         mediaType="multipart/form-data",
+     *         @OA\Schema(
+     *           @OA\Property(
+     *             description="excel file",
+     *             property="file",
+     *             type="string",
+     *             format="binary",
+     *           ),
+     *         )
+     *       )
+     *    )
      * ),
      * @param Request $request
      * @return JsonResponse
@@ -368,6 +419,7 @@ class UserController extends Controller{
             Notify::query()->create([
                 'from' => auth()->id(),
                 'to' => $temp->id,
+                'address' => $user->email,
                 'content' => "Mật khẩu đăng nhập hệ thống HUS",
                 'type' => NotiType::Email,
             ]);
@@ -388,6 +440,23 @@ class UserController extends Controller{
      *     response="200",
      *     description="Send mail successfully"
      * ),
+     *     @OA\RequestBody(
+     *     required=true,
+     *      @OA\JsonContent(
+     *         required={"subject","body"},
+     *      @OA\Property(property="subject", type="string", example="Subject"),
+     *      @OA\Property(property="body", type="string", example="Body"),
+     *     )
+     * ),
+     *          @OA\Parameter(
+     *      name="id",
+     *      in="path",
+     *      description="User id",
+     *      required=true,
+     *      @OA\Schema(
+     *      type="integer",
+     *      )
+     *     ),
      * ),
      *
      * @param $id
@@ -406,7 +475,8 @@ class UserController extends Controller{
             'from' => auth()->id(),
             'to' => $user->id,
             'content' => $request->subject.": ".$request->body,
-            'type' => NotiType::Email,
+            'address' => $user->email,
+            'kind' => NotiType::Email,
         ]);
         return response()->json(['message' => 'Send mail successfully']);
     }
@@ -421,6 +491,22 @@ class UserController extends Controller{
      *     response="200",
      *     description="Send sms successfully"
      * ),
+     *          @OA\RequestBody(
+     *     required=true,
+     *      @OA\JsonContent(
+     *          required={"message"},
+     *       @OA\Property(property="message", type="string", example="message"),
+     *      )
+     * ),
+     *          @OA\Parameter(
+     *      name="id",
+     *      in="path",
+     *      description="User id",
+     *      required=true,
+     *      @OA\Schema(
+     *      type="integer",
+     *      )
+     *     ),
      * ),
      *
      * @param $id
@@ -443,10 +529,20 @@ class UserController extends Controller{
         Notify::query()->create([
             'from' => auth()->id(),
             'to' => $user->id,
+            'address' => $user->phone,
             'content' => $request->message,
-            'type' => NotiType::SMS,
+            'kind' => NotiType::SMS,
         ]);
         return response()->json(['message' => 'Send sms successfully']);
     }
 
+    private function revokeToken($id)
+    {
+        $tokens = Redis::keys('Auth:*');
+        foreach ($tokens as $token) {
+            $token = explode(':', $token)[1];
+            if (json_decode(Redis::get("Auth:$token"))->id == $id)
+                Redis::del("Auth:$token");
+        }
+    }
 }

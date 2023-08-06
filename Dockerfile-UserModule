@@ -10,9 +10,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends\
     zlib1g-dev \
     libzip-dev \
     zip \
-    unzip \
-
-
+    unzip
 
 # Install PHP extensions
 RUN docker-php-ext-install pdo_mysql mbstring exif pcntl bcmath gd zip
@@ -29,10 +27,10 @@ COPY user-module /var/www/
 
 # Get ADB
 EXPOSE 5037
-RUN curl curl https://dl.google.com/android/repository/platform-tools_r34.0.4-linux.zip --output adb.zip
-RUN unzip adb.zip
-RUN rm adb.zip
-RUN mv platform-tools/adb /usr/bin/adb
+RUN curl https://dl.google.com/android/repository/platform-tools_r34.0.4-linux.zip --output ./adb.zip
+RUN unzip ./adb.zip
+RUN rm ./adb.zip
+RUN mv ./platform-tools/adb /usr/bin/adb
 RUN chmod +x /usr/bin/adb
 RUN rm -rf platform-tools
 

@@ -30,7 +30,7 @@ class UpdateDepartmentRequest extends FormRequest
                 "required",
                 "string",
                 "max:255",
-                Rule::unique(Department::class)->ignore($this->department),]
+                Rule::unique(Department::class)->ignore($this->id),]
         ];
     }
 }

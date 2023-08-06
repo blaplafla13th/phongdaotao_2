@@ -10,4 +10,5 @@ class UserHistory extends Model
     use HasFactory;
 
     protected $table = 'user_histories';
+    public $timestamps = false;
 }

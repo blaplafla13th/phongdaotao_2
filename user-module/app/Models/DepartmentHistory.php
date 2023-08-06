@@ -9,4 +9,5 @@ class DepartmentHistory extends Model
 {
     use HasFactory;
     protected $table = 'department_histories';
+    public $timestamps = false;
 }
