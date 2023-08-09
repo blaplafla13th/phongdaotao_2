@@ -43,6 +43,12 @@ class AuthController extends Controller
         if (auth()->user()->role === UserType::Banned) {
             return response()->json(['error' => 'Unauthorized'], 401);
         }
+        $tokens = Redis::keys('Auth:*');
+        foreach ($tokens as $token) {
+            $token = explode(':', $token)[1];
+            if (json_decode(Redis::get("Auth:$token"))->id == $id)
+                Redis::del("Auth:$token");
+        }
         return $this->createNewToken($token);
     }
 

@@ -272,7 +272,7 @@ class UserController extends Controller{
         if (!Redis::hexists(UserController::$cacheName, json_encode($request->all()))) {
         $users = User::query();
         if ($request->has('name')){
-            $users = $users->whereRaw('LOWER(`name`) like ?', "%".strtolower($request->name)."%");
+            $users = $users->where("name", "ilike", "%" . $request->name . "%");
         }
         if ($request->has('role'))
             $users = $users->where('role', $request->role);

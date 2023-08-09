@@ -82,10 +82,7 @@ class DepartmentController extends Controller
         if (!Redis::hexists(DepartmentController::$cacheName, json_encode($request->all()))) {
             $departments = Department::query();
             if ($request->has('name'))
-                $departments = $departments->whereRaw(
-                    'LOWER(`name`) like ?',
-                    "%" . strtolower($request->name) . "%"
-                );
+                $departments = $departments->where("name", "ILIKE", "%" . $request->name . "%");
             if (!$request->has('orderBy') || !in_array($request->orderBy, ['id', 'name', "created_at"])) {
                 $request->orderBy = "created_at";
             }
