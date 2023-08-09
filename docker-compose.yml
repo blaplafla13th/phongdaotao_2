@@ -40,16 +40,36 @@ services:
       - ./user-module/:/var/www
       - /var/www/vendor
   userdb: # turn it and wait until it done before turn user-api
-    image: mysql:latest
+    image: postgres:latest
     environment:
-      MYSQL_ROOT_PASSWORD: root
-      MYSQL_DATABASE: userdb
-      MYSQL_USER: user
-      MYSQL_PASSWORD: password
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: user-db
+  #    volumes:
+  #      - user-db:/var/lib/postgresql/data
 #    ports:
-#      - "3306:3306"
-#    volumes:
-#      - userdb:/var/lib/mysql
+  #      - "5432:5432"
 
+  paper-test-db:
+    image: postgres:latest
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: paper-test-db
+    #    volumes:
+    #      - paper-test-db:/var/lib/postgresql/data
+    ports:
+      - "5433:5432"
+
+  room-test-db:
+    image: postgres:latest
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: room-test-db
+#    volumes:
+    #      - room-test-db:/var/lib/postgresql/data
+    ports:
+      - "5434:5432"
 
 
