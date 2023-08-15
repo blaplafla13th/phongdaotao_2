@@ -46,7 +46,7 @@ class AuthController extends Controller
         $tokens = Redis::keys('Auth:*');
         foreach ($tokens as $token) {
             $token = explode(':', $token)[1];
-            if (json_decode(Redis::get("Auth:$token"))->id == $id)
+            if (json_decode(Redis::get("Auth:$token"))->id == auth()->id())
                 Redis::del("Auth:$token");
         }
         return $this->createNewToken($token);

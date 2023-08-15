@@ -10,11 +10,12 @@ services:
       - ./logs:/var/log/nginx
     depends_on:
       - user-api
+      - room-test-api
       - minio
-  minio: # run and setup first for all api
+  minio:
     image: minio/minio
-#    ports:
-#      - "9000:9000"
+    ports:
+      - "9000:9000"
 #      - "9001:9001"
 #    volumes:
 #      - ./minio_data:/data
@@ -23,12 +24,12 @@ services:
       - MINIO_ROOT_PASSWORD=password
       - MINIO_REGION=us-east-1
     command: server --console-address ":9001" /data
-  redis: # turn it first for all api
+  redis:
     image: redis:latest
     ports:
       - "6379:6379"
     command: redis-server --requirepass password
-  user-api: # turn it after userdb and wait until it done then open terminal connect adb with phone
+  user-api:
     build:
       context: .
       dockerfile: Dockerfile-UserModule
@@ -39,16 +40,28 @@ services:
     volumes:
       - ./user-module/:/var/www
       - /var/www/vendor
-  userdb: # turn it and wait until it done before turn user-api
+  room-test-api:
+    build:
+      context: .
+      dockerfile: Dockerfile-RoomModule
+    depends_on:
+      - room-test-db
+      - minio
+      - redis
+    volumes:
+      - ./room-test-module/:/var/www
+      - /var/www/vendor
+  userdb:
     image: postgres:latest
     environment:
       POSTGRES_USER: user
       POSTGRES_PASSWORD: password
       POSTGRES_DB: user-db
+      TZ: Asia/Ho_Chi_Minh
   #    volumes:
   #      - user-db:/var/lib/postgresql/data
-#    ports:
-  #      - "5432:5432"
+    ports:
+      - "5432:5432"
 
   paper-test-db:
     image: postgres:latest
@@ -56,6 +69,7 @@ services:
       POSTGRES_USER: user
       POSTGRES_PASSWORD: password
       POSTGRES_DB: paper-test-db
+      TZ: Asia/Ho_Chi_Minh
     #    volumes:
     #      - paper-test-db:/var/lib/postgresql/data
     ports:
@@ -67,6 +81,7 @@ services:
       POSTGRES_USER: user
       POSTGRES_PASSWORD: password
       POSTGRES_DB: room-test-db
+      TZ: Asia/Ho_Chi_Minh
 #    volumes:
     #      - room-test-db:/var/lib/postgresql/data
     ports:
