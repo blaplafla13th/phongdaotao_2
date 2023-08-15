@@ -289,7 +289,14 @@ class UserController extends Controller{
                 $request->order = 'desc';
             $users = $users->orderBy($request->sortBy, $request->order)
                 ->paginate($request->size ?? 10, ['id', 'name', 'email', 'phone', 'role', 'department_id', 'created_at'], 'page', $request->page ?? 0);
-            Redis::hset(UserController::$cacheName, json_encode($request->all()), json_encode($users));
+            $response = [
+                "data" => $users->items(),
+                "current_page" => $users->currentPage(),
+                "last_page" => $users->lastPage(),
+                "per_page" => $users->perPage(),
+                "total" => $users->total()
+            ];
+            Redis::hset(UserController::$cacheName, json_encode($request->all()), json_encode($response));
         }
         return response()->json(json_decode(Redis::hget(UserController::$cacheName, json_encode($request->all()))));
     }

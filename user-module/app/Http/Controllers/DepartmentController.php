@@ -92,7 +92,14 @@ class DepartmentController extends Controller
             $departments = $departments->orderBy($request->orderBy, $request->orderType)
                 ->paginate($request->size ?? 10, ['id', 'name', "created_at"],
                 'page', $request->page ?? 0);
-            Redis::hset(DepartmentController::$cacheName, json_encode($request->all()), json_encode($departments));
+            $response = [
+                "data" => $departments->items(),
+                "current_page" => $departments->currentPage(),
+                "last_page" => $departments->lastPage(),
+                "per_page" => $departments->perPage(),
+                "total" => $departments->total()
+            ];
+            Redis::hset(DepartmentController::$cacheName, json_encode($request->all()), json_encode($response));
         }
         return response()->json(json_decode(Redis::hget(DepartmentController::$cacheName, json_encode($request->all()))));
     }

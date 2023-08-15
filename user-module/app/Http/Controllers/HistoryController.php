@@ -91,7 +91,14 @@ class HistoryController extends Controller
             $history =
                 $history->orderBy($request->sortBy, $request->order)
                     ->paginate($request->size ?? 10, ['*'], 'page', $request->page ?? 0);
-            Redis::hset(HistoryController::$cacheNameUsers, json_encode($request->all()), json_encode($history));
+            $response = [
+                "data" => $history->items(),
+                "current_page" => $history->currentPage(),
+                "last_page" => $history->lastPage(),
+                "per_page" => $history->perPage(),
+                "total" => $history->total()
+            ];
+            Redis::hset(HistoryController::$cacheNameUsers, json_encode($request->all()), json_encode($response));
         }
         return response()->json(json_decode(Redis::hget(HistoryController::$cacheNameUsers, json_encode($request->all()))));
     }
@@ -251,7 +258,14 @@ class HistoryController extends Controller
             $history =
                 $history->orderBy($request->sortBy, $request->order)
                     ->paginate($request->size ?? 10, ['*'], 'page', $request->page ?? 0);
-            Redis::hset(HistoryController::$cacheNameDepartments, json_encode($request->all()), json_encode($history));
+            $response = [
+                "data" => $history->items(),
+                "current_page" => $history->currentPage(),
+                "last_page" => $history->lastPage(),
+                "per_page" => $history->perPage(),
+                "total" => $history->total()
+            ];
+            Redis::hset(HistoryController::$cacheNameDepartments, json_encode($request->all()), json_encode($response));
         }
         return response()->json(json_decode(Redis::hget(HistoryController::$cacheNameDepartments, json_encode($request->all()))));
     }
@@ -404,7 +418,14 @@ class HistoryController extends Controller
             $history =
                 $history->orderBy($request->sortBy, $request->order)
                     ->paginate($request->size ?? 10, ['*'], 'page', $request->page ?? 0);
-            Redis::hset(HistoryController::$cacheNameNoti, json_encode($request->all()), json_encode($history));
+            $response = [
+                "data" => $history->items(),
+                "current_page" => $history->currentPage(),
+                "last_page" => $history->lastPage(),
+                "per_page" => $history->perPage(),
+                "total" => $history->total()
+            ];
+            Redis::hset(HistoryController::$cacheNameNoti, json_encode($request->all()), json_encode($response));
         }
         return response()->json(json_decode(Redis::hget(HistoryController::$cacheNameNoti, json_encode($request->all()))));
     }
