@@ -1,3 +1,4 @@
+#!/bin/bash
 composer install --no-cache
 if [ ! -f ".env" ]
 then
