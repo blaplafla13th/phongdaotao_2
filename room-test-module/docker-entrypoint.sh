@@ -1,3 +1,4 @@
+#!/bin/bash
 composer install --no-cache
 composer dump-autoload
 if [ ! -f ".env" ]

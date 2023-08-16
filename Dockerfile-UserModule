@@ -36,4 +36,5 @@ RUN mv ./platform-tools/adb /usr/bin/adb
 RUN chmod +x /usr/bin/adb
 RUN rm -rf platform-tools
 
-ENTRYPOINT ["bash", "docker-entrypoint.sh"]
+RUN chmod +x ./docker-entrypoint.sh
+ENTRYPOINT ["./docker-entrypoint.sh"]

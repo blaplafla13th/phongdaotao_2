@@ -32,5 +32,5 @@ RUN pip install pandas psycopg2-binary sqlalchemy --break-system-packages
 
 # Clear cache
 RUN apt-get clean && rm -rf /var/lib/apt/lists/*
-
-ENTRYPOINT ["bash", "docker-entrypoint.sh"]
+RUN chmod +x ./docker-entrypoint.sh
+ENTRYPOINT ["./docker-entrypoint.sh"]
