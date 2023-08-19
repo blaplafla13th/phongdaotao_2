@@ -18,6 +18,7 @@ return new class extends Migration {
             $table->timestamp("check");
             $table->String('position', 5);
             $table->Integer('shift_id');
+            $table->unique(['supervisor', 'shift_id']);
         });
     }
 

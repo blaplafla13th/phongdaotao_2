@@ -117,14 +117,14 @@ class AssignmentController extends Controller
      * @param Request $request
      * @return JsonResponse
      */
-    public function index(Request $request): JsonResponse
+    public function index(Request $request)/*: JsonResponse*/
     {
         if (!Redis::hexists(AssignmentController::$cacheName, json_encode($request->all()))) {
             $assignments = Assignment::query();
             $assignments = $assignments->join('shifts', 'shifts.id', '=', 'assignments.shift_id');
 
             if ($request->has('name')) {
-                $data = json_decode(e_api()->request('GET', "http://users.blaplafla.test" . '/api/users', [
+                $data = json_decode(e_api()->request('GET', env("USER_MOD", "http://user-api") . '/api/users', [
                     'query' => [
                         'name' => $request->name,
                         'size' => 1000
@@ -136,10 +136,10 @@ class AssignmentController extends Controller
             }
 
             if ($request->has('user_id'))
-                $assignments = $assignments->where('supervisor', $request->id);
+                $assignments = $assignments->where('supervisor', $request->user_id);
 
             if ($request->has('shift_id'))
-                $assignments = $assignments->where('shift_id', $request->id);
+                $assignments = $assignments->where('shift_id', $request->shift_id);
 
             if ($request->has('from'))
                 $assignments = $assignments->where("shift_start_time", ">=", Carbon::parse($request->from)->format('Y/m/d H:i:s'));
@@ -147,7 +147,7 @@ class AssignmentController extends Controller
             if ($request->has('to'))
                 $assignments = $assignments->where("shift_start_time", "<=", Carbon::parse($request->to)->format('Y/m/d H:i:s'));
 
-            if (!$request->has('orderBy') || !in_array($request->orderBy, ['id', 'supervisor', "shift_id"]))
+            if (!$request->has('orderBy') || !in_array($request->orderBy, ['id', 'supervisor', "shift_id", "shift_start_time"]))
                 $request->orderBy = "id";
 
             if (!$request->has('order') || !in_array($request->orderType, ['asc', 'desc']))
@@ -156,6 +156,8 @@ class AssignmentController extends Controller
             $assignments = $assignments->orderBy($request->orderBy, $request->orderType)
                 ->paginate($request->size ?? 10, [DB::raw('assignments.id as id'), 'supervisor', "shift_id", "shift_start_time"],
                     'page', $request->page ?? 0);
+
+
             $response = [
                 "data" => $assignments->items(),
                 "current_page" => $assignments->currentPage(),
@@ -203,7 +205,7 @@ class AssignmentController extends Controller
      */
     public function store(StoreRequest $request): JsonResponse
     {
-        $data = e_api()->request('GET', "http://users.blaplafla.test" . '/api/users/' . $request->supervisor);
+        $data = e_api()->request('GET', env("USER_MOD", "http://user-api") . '/api/users/' . $request->supervisor);
         if ($data->getStatusCode() != 200) {
             return response()->json(['message' => 'Supervisor not found'], 404);
         }
@@ -292,7 +294,7 @@ class AssignmentController extends Controller
      */
     public function update(UpdateRequest $request, $id)
     {
-        $data = e_api()->request('GET', "http://users.blaplafla.test" . '/api/users/' . $request->supervisor);
+        $data = e_api()->request('GET', env("USER_MOD", "http://user-api") . '/api/users/' . $request->supervisor);
         if ($data->getStatusCode() != 200) {
             return response()->json(['message' => 'Supervisor not found'], 404);
         }

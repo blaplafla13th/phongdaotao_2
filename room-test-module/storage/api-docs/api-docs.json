@@ -1113,7 +1113,7 @@
                                         "type": "integer"
                                     },
                                     "need_supervisor": {
-                                        "type": "boolean"
+                                        "type": "integer"
                                     },
                                     "shift_id": {
                                         "type": "integer"
@@ -1201,7 +1201,7 @@
                                         "type": "integer"
                                     },
                                     "need_supervisor": {
-                                        "type": "boolean"
+                                        "type": "integer"
                                     },
                                     "shift_id": {
                                         "type": "integer"

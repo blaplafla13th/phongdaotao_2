@@ -184,7 +184,7 @@ class RoomTestController extends Controller
      *   ),
      *      @OA\Property(
      *      property="need_supervisor",
-     *      type="boolean"
+     *      type="integer"
      *  ),
      *      @OA\Property(
      *      property="shift_id",
@@ -201,7 +201,8 @@ class RoomTestController extends Controller
     public function store(StoreRequest $request): JsonResponse
     {
         Redis::del(RoomTestController::$cacheName);
-        RoomTest::query()->create([$request->validated(), "last_edited" => get_user()->id]);
+        $data = array_merge($request->validated(), ["last_edited" => get_user()->id]);
+        RoomTest::query()->create($data);
         return response()->json(['message' => 'Room successfully created']);
     }
 
@@ -278,7 +279,7 @@ class RoomTestController extends Controller
      *  ),
      *     @OA\Property(
      *     property="need_supervisor",
-     *     type="boolean"
+     *     type="integer"
      * ),
      *     @OA\Property(
      *     property="shift_id",
@@ -299,7 +300,8 @@ class RoomTestController extends Controller
     {
         Redis::del(RoomTestController::$cacheName);
         $room = RoomTest::query()->findOrFail($id);
-        $room->update([$request->validated(), "last_edited" => get_user()->id]);
+        $data = array_merge($request->validated(), ["last_edited" => get_user()->id]);
+        $room->update($data);
         return response()->json(['message' => 'Room successfully updated']);
     }
 

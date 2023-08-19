@@ -125,7 +125,7 @@ class CheckinController extends Controller
             $checkins = $checkins->join('shifts', 'shifts.id', '=', 'checkins.shift_id');
 
             if ($request->has('name')) {
-                $data = json_decode(e_api()->request('GET', "http://users.blaplafla.test" . '/api/users', [
+                $data = json_decode(e_api()->request('GET', env("USER_MOD", "http://user-api") . '/api/users', [
                     'query' => [
                         'name' => $request->name,
                         'size' => 1000
@@ -137,10 +137,10 @@ class CheckinController extends Controller
             }
 
             if ($request->has('user_id'))
-                $checkins = $checkins->where('supervisor', $request->id);
+                $checkins = $checkins->where('supervisor', $request->user_id);
 
             if ($request->has('shift_id'))
-                $checkins = $checkins->where('shift_id', $request->id);
+                $checkins = $checkins->where('shift_id', $request->shift_id);
 
             if ($request->has('from'))
                 $checkins = $checkins->where("shift_start_time", ">=", Carbon::parse($request->from)->format('Y/m/d H:i:s'));
@@ -224,11 +224,14 @@ class CheckinController extends Controller
             ->where("supervisor", get_user()->id)
             ->where("shift_id", $shift->id);
         if (!$data->exists()) {
-            $rooms = Redis::hGetAll("supervisor_checkin" . $shift->id);
-            if (count($rooms) == 0)
+            if (Redis::lLen("supervisor_checkin" . $shift->id) == 0)
                 return response()->json(['message' => 'No room to checkin'], 404);
-            $roomid = array_rand($rooms);
-            $room = json_decode(Redis::hget("supervisor_checkin" . $shift->id, $roomid));
+            $room = json_decode(Redis::lpop("supervisor_checkin" . $shift->id));
+//            $rooms = Redis::hGetAll("supervisor_checkin" . $shift->id);
+//            if (count($rooms) == 0)
+//                return response()->json(['message' => 'No room to checkin'], 404);
+//            $roomid = array_rand($rooms);
+//            $room = json_decode(Redis::hget("supervisor_checkin" . $shift->id, $roomid));
             $position = RoomDetail::query()->where('id', $room->position)->firstOrFail()->name;
             $checkin = Checkin::query()->create([
                 'supervisor' => get_user()->id,
@@ -241,16 +244,32 @@ class CheckinController extends Controller
             $test->update([
                 'supervisor' . $room->supervisor => $checkin->id,
             ]);
-            Redis::hdel("supervisor_checkin" . $shift->id, $roomid);
+//            Redis::hdel("supervisor_checkin" . $shift->id, $roomid);
             return response()->json([
                 'message' => 'Checkin success',
                 'position' => $position,
                 'exam_test_id' => $test->exam_test_id,
+                'supervisor' => $room->supervisor
             ]);
         } else {
+            $data = $data->first();
+            $test = RoomTest::query()
+                ->orWhere('supervisor1', '=', $data->id)
+                ->orWhere('supervisor2', '=', $data->id)
+                ->orWhere('supervisor3', '=', $data->id)
+                ->where('id', '=', $shift->id)
+                ->first();
+            if ($test->supervisor1 == $data->id)
+                $supervisor = 1;
+            if ($test->supervisor2 == $data->id)
+                $supervisor = 2;
+            if ($test->supervisor3 == $data->id)
+                $supervisor = 3;
             return response()->json([
                 'message' => 'You have already checked in',
-                'position' => $data->first()->position,
+                'position' => $data->position,
+                'exam_test_id' => $test->exam_test_id,
+                'supervisor' => $supervisor
             ]);
         }
     }
@@ -436,49 +455,37 @@ class CheckinController extends Controller
      */
     public function summary(SummaryRequest $request)
     {
-        $subquery = Checkin::query()->select(
-            'supervisor',
-            DB::raw('count(*) FILTER ( WHERE checkins.check > shifts.link_end_time ) as late')
-        )->join('shifts', 'shifts.id', '=', 'checkins.shift_id')
-            ->groupBy('supervisor');
-
-        if ($request->exists('shifts'))
-            $subquery->whereIn('shifts.id', $request->shifts);
-
-        $from = 0;
-        $to = 0;
-
-        if ($request->exists('from') && $request->exists('to')) {
-            $from = Carbon::parse($request->from)->format('Y/m/d 00:00:00');
-            $to = Carbon::parse($request->to)->format('Y/m/d 23:59:59');
-            $subquery->where('shifts.shift_start_time', '>=', $from);
-            $subquery->where('shifts.shift_start_time', '<=', $to);
-        } elseif ($request->exists('from') || $request->exists('to')) {
-            $time = $request->from ?? $request->to;
-            $from = Carbon::parse($time)->format('Y/m/d 00:00:00');
-            $to = Carbon::parse($time)->format('Y/m/d 23:59:59');
-            $subquery->where('shifts.shift_start_time', '>=', $from);
-            $subquery->where('shifts.shift_start_time', '<=', $to);
-        }
-
-        if ($request->has('supervisors'))
-            $subquery->whereIn('supervisor', $request->supervisors);
-
         $checkin = Checkin::query()->select(
             DB::raw("checkins.supervisor as supervisor"),
             DB::raw('count(*) as total'),
-            DB::raw('c.late'),
-        )->joinSub($subquery, 'c', function ($join) {
-            $join->on('checkins.supervisor', '=', 'c.supervisor');
-        })->groupBy('checkins.supervisor', 'c.late');
+            DB::raw('count(*) filter ( where checkins.check > shifts.link_end_time ) as late')
+        )->join('shifts', 'shifts.id', '=', 'checkins.shift_id')
+            ->groupBy("checkins.supervisor");
 
-        if ($request->has('supervisors'))
-            $checkin->whereIn('checkins.supervisor', $request->supervisors);
+        if ($request->exists('from') || $request->exists('to')) {
+            if ($request->exists('from') && $request->exists('to')) {
+                $from = Carbon::parse($request->from)->format('Y/m/d 00:00:00');
+                $to = Carbon::parse($request->to)->format('Y/m/d 23:59:59');
+            } else {
+                $time = $request->from ?? $request->to;
+                $from = Carbon::parse($time)->format('Y/m/d 00:00:00');
+                $to = Carbon::parse($time)->format('Y/m/d 23:59:59');
+            }
+            $checkin = $checkin->whereBetween('shifts.shift_start_time', [$from, $to]);
+        }
 
-//        return $checkin->toSql();
+        if ($request->exists('shifts')) {
+            $checkin = $checkin->whereIn('shifts.id', $request->shifts);
+        }
+
+        if ($request->has('supervisors')) {
+            $checkin = $checkin->whereIn('supervisor', $request->supervisors);
+        }
+
+//        DB::enableQueryLog();
         $checkin = $checkin->get();
-
-        if ($from == 0 && $to == 0) {
+//        return DB::getQueryLog();
+        if (!isset($from) || !isset($to)) {
             if ($request->exists('shifts')) {
                 $from = Shift::query()->whereIn('id', $request->shifts)->min('shift_start_time');
                 $to = Shift::query()->whereIn('id', $request->shifts)->max('shift_start_time');

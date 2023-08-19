@@ -16,6 +16,7 @@ return new class extends Migration {
             $table->id();
             $table->Integer('supervisor');
             $table->Integer('shift_id');
+            $table->unique(['supervisor', 'shift_id']);
         });
     }
 

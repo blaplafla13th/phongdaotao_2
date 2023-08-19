@@ -111,7 +111,7 @@ class ShiftController extends Controller
         if (!Redis::hexists(ShiftController::$cacheName, json_encode($request->all()))) {
             $shifts = Shift::query();
             if ($request->has('name')) {
-                $data = json_decode(e_api()->request('GET', "http://users.blaplafla.test" . '/api/users', [
+                $data = json_decode(e_api()->request('GET', env("USER_MOD", "http://user-api") . '/api/users', [
                     'query' => [
                         'name' => $request->name,
                         'size' => 1000
@@ -122,7 +122,7 @@ class ShiftController extends Controller
                 }, $data));
             }
             if ($request->has('master')) {
-                $shifts = $shifts->where('master', $request->id);
+                $shifts = $shifts->where('master', $request->master);
             }
             if ($request->has('from'))
                 $shifts = $shifts->where("shift_start_time", ">=", Carbon::parse($request->from)->format('Y/m/d H:i:s'));
@@ -200,10 +200,13 @@ class ShiftController extends Controller
         ]);
         if ($request->has('master')) {
             e_api()->post(env("USER_MOD", "http://user-api") . '/api/users/send-mail/' . $request->master, [
-                'headers' => ['Authorization' => $request->header('Authorization')],
+                'headers' => [
+                    'Authorization' => $request->header('Authorization'),
+                    'content-type' => "application/json",
+                ],
                 'body' => json_encode([
                     'subject' => 'Ca thi mới',
-                    'body' => 'Mã ca thi của bạn là: ' . $data->url .'. Coi thi lúc: ' . $data->shift_start_time .'.'
+                    'body' => 'Mã ca thi của bạn là: ' . $data->url . '. Coi thi lúc: ' . $data->shift_start_time . '.'
                 ])
             ]);
         }
@@ -327,17 +330,20 @@ class ShiftController extends Controller
         $users = Assignment::query()->where('shift_id', '=', $shift->id)->pluck('supervisor');
         Redis::set("assignment" . $shift->id, json_encode($users));
         Redis::del("supervisor_checkin" . $shift->id);
-        $count = 0;
+        $list = [];
         foreach ($rooms as $room) {
             for ($i = 1; $i <= $room->need_supervisor; $i++) {
                 if ($room->getAttribute('supervisor' . $i) == null)
-                    Redis::hset("supervisor_checkin" . $shift->id, ++$count, json_encode([
+                    $list[] = [
                         'room_test' => $room->id,
                         'position' => $room->room_detail_id,
                         'supervisor' => $i,
-                    ]));
+                    ];
             }
         }
+        shuffle($list);
+        foreach ($list as $item)
+            Redis::lpush("supervisor_checkin" . $shift->id, json_encode($item));
 
 //        header('Content-Disposition: attachment;filename="image.png"');
         header('Content-Type: image/png');
@@ -345,7 +351,7 @@ class ShiftController extends Controller
             ->format('png')
             ->margin(1)
             ->encoding('UTF-8')
-            ->generate("http://" . env('APP_URL') . "api/checkin/join/" . $request->url);
+            ->generate("http://" . env('APP_URL') . "/api/checkin/join/" . $request->url);
     }
 
     /**
@@ -406,16 +412,18 @@ class ShiftController extends Controller
             "shift_start_time" => $request->shift_start_time,
             "master" => $request->master,
         ]);
-        e_api()->post(env("USER_MOD", "http://user-api") . '/api/users/send-mail/' . $request->master, [
-            'headers' => [
-                'Authorization' => $request->header('Authorization'),
-                'content-type' => "application/json",
-            ],
-            'body' => json_encode([
-                'subject' => 'Ca thi mới',
-                'body' => 'Mã ca thi của bạn là: ' . $shift->url .'. Coi thi lúc: ' . $shift->shift_start_time .'.'
-            ])
-        ]);
+        if ($request->has('master')) {
+            e_api()->post(env("USER_MOD", "http://user-api") . '/api/users/send-mail/' . $request->master, [
+                'headers' => [
+                    'Authorization' => $request->header('Authorization'),
+                    'content-type' => "application/json",
+                ],
+                'body' => json_encode([
+                    'subject' => 'Ca thi mới',
+                    'body' => 'Mã ca thi của bạn là: ' . $shift->url . '. Coi thi lúc: ' . $shift->shift_start_time . '.'
+                ])
+            ]);
+        }
         return response()->json(['message' => 'Shift successfully updated']);
     }
 }

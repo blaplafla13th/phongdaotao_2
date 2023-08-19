@@ -7,12 +7,14 @@ use App\Http\Requests\Auth\LoginRequest;
 use App\Http\Requests\User\UpdatePassword;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Redis;
+use Tymon\JWTAuth\Facades\JWTAuth;
 
 class AuthController extends Controller
 {
     public function __construct() {
-        $this->middleware('auth:api', ['except' => ['login']]);
+        $this->middleware('api', ['except' => ['login']]);
     }
 
     /**
@@ -46,10 +48,13 @@ class AuthController extends Controller
         $tokens = Redis::keys('Auth:*');
         foreach ($tokens as $token) {
             $token = explode(':', $token)[1];
-            if (json_decode(Redis::get("Auth:$token"))->id == auth()->id())
+            if (json_decode(Redis::get("Auth:$token"))->id == auth()->id()) {
                 Redis::del("Auth:$token");
+                JWTAuth::setToken($token);
+                JWTAuth::invalidate();
+            }
         }
-        return $this->createNewToken($token);
+        return $this->createNewToken(auth()->login(auth()->user()));
     }
 
     /**
@@ -68,7 +73,7 @@ class AuthController extends Controller
     public function logout(): JsonResponse
     {
         Redis::del('Auth:' . request()->bearerToken());
-        auth()->logout();
+        auth()->logout(true);
         return response()->json(['message' => 'User successfully signed out']);
     }
 
@@ -147,10 +152,11 @@ class AuthController extends Controller
      */
     protected function changePassword(UpdatePassword $request): JsonResponse
     {
-        Redis::del('Auth:' . request()->bearerToken());
-        $userId = User::query()->findOrFail(auth()->id());
-        $user = User::query()->where('id', $userId,'password',$request->old_password);
-        if (!$user) {
+        Redis::del('Auth:' . request()->bearerToken());;
+        $user = User::query()
+            ->where('id', '=', auth()->id())
+            ->first();
+        if ($user == null || !Hash::check($request->old_password, $user->password)) {
             return response()->json(['message' => 'Password is incorrect']);
         }
         $user->update(['password' => $request->new_password]);
