@@ -246,6 +246,7 @@ class CheckinController extends Controller
                 'message' => 'Checkin success',
                 'position' => $position,
                 'exam_test_id' => $test->exam_test_id,
+                'supervisor' => $room->supervisor
             ]);
         } else {
             return response()->json([
@@ -436,49 +437,37 @@ class CheckinController extends Controller
      */
     public function summary(SummaryRequest $request)
     {
-        $subquery = Checkin::query()->select(
-            'supervisor',
-            DB::raw('count(*) FILTER ( WHERE checkins.check > shifts.link_end_time ) as late')
-        )->join('shifts', 'shifts.id', '=', 'checkins.shift_id')
-            ->groupBy('supervisor');
-
-        if ($request->exists('shifts'))
-            $subquery->whereIn('shifts.id', $request->shifts);
-
-        $from = 0;
-        $to = 0;
-
-        if ($request->exists('from') && $request->exists('to')) {
-            $from = Carbon::parse($request->from)->format('Y/m/d 00:00:00');
-            $to = Carbon::parse($request->to)->format('Y/m/d 23:59:59');
-            $subquery->where('shifts.shift_start_time', '>=', $from);
-            $subquery->where('shifts.shift_start_time', '<=', $to);
-        } elseif ($request->exists('from') || $request->exists('to')) {
-            $time = $request->from ?? $request->to;
-            $from = Carbon::parse($time)->format('Y/m/d 00:00:00');
-            $to = Carbon::parse($time)->format('Y/m/d 23:59:59');
-            $subquery->where('shifts.shift_start_time', '>=', $from);
-            $subquery->where('shifts.shift_start_time', '<=', $to);
-        }
-
-        if ($request->has('supervisors'))
-            $subquery->whereIn('supervisor', $request->supervisors);
-
         $checkin = Checkin::query()->select(
             DB::raw("checkins.supervisor as supervisor"),
             DB::raw('count(*) as total'),
-            DB::raw('c.late'),
-        )->joinSub($subquery, 'c', function ($join) {
-            $join->on('checkins.supervisor', '=', 'c.supervisor');
-        })->groupBy('checkins.supervisor', 'c.late');
+            DB::raw('count(*) filter ( where checkins.check > shifts.link_end_time ) as late')
+        )->join('shifts', 'shifts.id', '=', 'checkins.shift_id')
+            ->groupBy("checkins.supervisor");
 
-        if ($request->has('supervisors'))
-            $checkin->whereIn('checkins.supervisor', $request->supervisors);
+        if ($request->exists('from') || $request->exists('to')) {
+            if ($request->exists('from') && $request->exists('to')) {
+                $from = Carbon::parse($request->from)->format('Y/m/d 00:00:00');
+                $to = Carbon::parse($request->to)->format('Y/m/d 23:59:59');
+            } else {
+                $time = $request->from ?? $request->to;
+                $from = Carbon::parse($time)->format('Y/m/d 00:00:00');
+                $to = Carbon::parse($time)->format('Y/m/d 23:59:59');
+            }
+            $checkin = $checkin->whereBetween('shifts.shift_start_time', [$from, $to]);
+        }
 
-//        return $checkin->toSql();
+        if ($request->exists('shifts')) {
+            $checkin = $checkin->whereIn('shifts.id', $request->shifts);
+        }
+
+        if ($request->has('supervisors')) {
+            $checkin = $checkin->whereIn('supervisor', $request->supervisors);
+        }
+
+//        DB::enableQueryLog();
         $checkin = $checkin->get();
-
-        if ($from == 0 && $to == 0) {
+//        return DB::getQueryLog();
+        if (!isset($from) || !isset($to)) {
             if ($request->exists('shifts')) {
                 $from = Shift::query()->whereIn('id', $request->shifts)->min('shift_start_time');
                 $to = Shift::query()->whereIn('id', $request->shifts)->max('shift_start_time');

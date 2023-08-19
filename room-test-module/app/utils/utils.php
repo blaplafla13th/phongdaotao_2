@@ -12,5 +12,7 @@ function get_user()
 
 function e_api()
 {
-    return new Client();
+    return new Client(
+        ['http_errors' => false,]
+    );
 }

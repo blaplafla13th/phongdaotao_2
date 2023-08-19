@@ -200,10 +200,13 @@ class ShiftController extends Controller
         ]);
         if ($request->has('master')) {
             e_api()->post(env("USER_MOD", "http://user-api") . '/api/users/send-mail/' . $request->master, [
-                'headers' => ['Authorization' => $request->header('Authorization')],
+                'headers' => [
+                    'Authorization' => $request->header('Authorization'),
+                    'content-type' => "application/json",
+                ],
                 'body' => json_encode([
                     'subject' => 'Ca thi mới',
-                    'body' => 'Mã ca thi của bạn là: ' . $data->url .'. Coi thi lúc: ' . $data->shift_start_time .'.'
+                    'body' => 'Mã ca thi của bạn là: ' . $data->url . '. Coi thi lúc: ' . $data->shift_start_time . '.'
                 ])
             ]);
         }
@@ -406,16 +409,18 @@ class ShiftController extends Controller
             "shift_start_time" => $request->shift_start_time,
             "master" => $request->master,
         ]);
-        e_api()->post(env("USER_MOD", "http://user-api") . '/api/users/send-mail/' . $request->master, [
-            'headers' => [
-                'Authorization' => $request->header('Authorization'),
-                'content-type' => "application/json",
-            ],
-            'body' => json_encode([
-                'subject' => 'Ca thi mới',
-                'body' => 'Mã ca thi của bạn là: ' . $shift->url .'. Coi thi lúc: ' . $shift->shift_start_time .'.'
-            ])
-        ]);
+        if ($request->has('master')) {
+            e_api()->post(env("USER_MOD", "http://user-api") . '/api/users/send-mail/' . $request->master, [
+                'headers' => [
+                    'Authorization' => $request->header('Authorization'),
+                    'content-type' => "application/json",
+                ],
+                'body' => json_encode([
+                    'subject' => 'Ca thi mới',
+                    'body' => 'Mã ca thi của bạn là: ' . $shift->url . '. Coi thi lúc: ' . $shift->shift_start_time . '.'
+                ])
+            ]);
+        }
         return response()->json(['message' => 'Shift successfully updated']);
     }
 }
