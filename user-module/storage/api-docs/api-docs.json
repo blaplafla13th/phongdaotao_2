@@ -137,6 +137,25 @@
                 ]
             }
         },
+        "/api/clear": {
+            "get": {
+                "tags": [
+                    "Clear"
+                ],
+                "summary": "Clear cache",
+                "operationId": "d6c49263ec20ea940d9d75cc5ca5e0cc",
+                "responses": {
+                    "200": {
+                        "description": "Clear cache"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "/api/departments": {
             "get": {
                 "tags": [

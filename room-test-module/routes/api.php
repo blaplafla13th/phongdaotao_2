@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\AssignmentController;
 use App\Http\Controllers\CheckinController;
+use App\Http\Controllers\Controller;
 use App\Http\Controllers\RoomDetailController;
 use App\Http\Controllers\RoomDetailHistoryController;
 use App\Http\Controllers\RoomTestController;
@@ -116,3 +117,5 @@ Route::group([
     Route::post('/{id}', [CheckinController::class, 'create']);
     Route::put('/{id}/{id_checkin}', [CheckinController::class, 'update']);
 });
+
+Route::get('/clear', [Controller::class, 'clear_cache'])->middleware(CheckAdmin::class);

@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\Controller;
 use App\Http\Controllers\DepartmentController;
 use App\Http\Controllers\HistoryController;
 use App\Http\Controllers\UserController;
@@ -103,3 +104,5 @@ Route::group([
     Route::post('/department', [DepartmentController::class, 'import']);
     Route::get('/department', [DepartmentController::class, 'getTemplate']);
 });
+
+Route::get('/clear', [Controller::class, 'clear_cache'])->middleware(CheckAdmin::class);
