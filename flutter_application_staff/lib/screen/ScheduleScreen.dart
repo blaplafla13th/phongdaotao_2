@@ -63,6 +63,11 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
   }
 
   Widget buildSchedule(List<dynamic> schedule, BuildContext bld) {
+    if (schedule.length == 0) {
+      return Center(
+        child: Text('No schedule'),
+      );
+    }
     return ListView.builder(
       itemCount: schedule.length,
       itemBuilder: (context, index) {
